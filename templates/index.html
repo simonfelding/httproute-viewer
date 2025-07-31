@@ -119,11 +119,11 @@
                 <!-- Card Footer with metadata -->
                 <div class="bg-zinc-100/50 rounded-b-2xl px-6 py-5 mt-auto border-t border-zinc-200 space-y-5">
                     {% if route.metadata.annotations %}
-                        {% set excluded_keys = ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
-                        {% set other_annotations = [] %}
+                        {# Create a new dictionary containing only the 'other' annotations #}
+                        {% set other_annotations = {} %}
                         {% for key, value in route.metadata.annotations.items() %}
-                            {% if key not in excluded_keys %}
-                                {% do other_annotations.append((key, value)) %}
+                            {% if key not in ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
+                                {% do other_annotations.update({key: value}) %}
                             {% endif %}
                         {% endfor %}
 
@@ -131,10 +131,12 @@
                         <div>
                             <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
                             <div class="flex flex-wrap gap-1.5">
-                                {% for key, value in other_annotations %}
+                                {# Iterate over the items of the new dictionary, which is a safe operation #}
+                                {% for key, value in other_annotations.items() %}
                                 <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
                                     <span class="font-semibold">{{ key }}</span>:
-                                    {% if value.startswith('http') %}
+                                    {# Add a check to ensure value is a string before calling startswith #}
+                                    {% if value is string and value.startswith('http') %}
                                         <a href="{{ value }}" target="_blank" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
                                     {% else %}
                                         <span class="opacity-80">{{ value }}</span>

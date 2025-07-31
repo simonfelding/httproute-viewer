@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kubernetes HTTPRoute Viewer</title>
-    <link href="/static/tailwind.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Add a smooth transition for color and visibility changes */
         .card {
-            transition: background-color 0.3s ease, border-color 0.3s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
     </style>
 </head>
@@ -48,7 +48,7 @@
                 <div class="flex-grow">
                     <div class="flex justify-between items-baseline mb-2">
                         <h2 class="text-xl font-semibold truncate" title="{{ route.metadata.name }}">{{ route.metadata.name }}</h2>
-                        <p class="text-sm text-slate-500 ml-4 flex-shrink-0">{{ route.metadata.namespace }}</p>
+                        <p class="text-sm text-slate-500 ml-4 flex-shrink-0">Namespace:<br />{{ route.metadata.namespace }}</p>
                     </div>
 
                     <!-- === Display description annotation if present === -->
@@ -212,7 +212,6 @@
                 });
             };
 
-            // Function to reset UI before a refresh
             const resetUIForRefresh = () => {
                 document.querySelectorAll('.status-indicator').forEach(indicator => {
                     indicator.classList.remove('bg-green-400', 'bg-red-400');
@@ -222,7 +221,6 @@
                     messageEl.innerHTML = `<span class="text-slate-500">Checking...</span>`;
                 });
                 allCards.forEach(card => {
-                     // Only reset card status if it wasn't pre-failed by a gateway condition
                     if (!card.innerHTML.includes('text-red-500')) {
                         card.dataset.status = 'neutral';
                     }
@@ -230,7 +228,6 @@
                 });
             };
 
-            // Encapsulated function to run all health checks
             const runAllHealthChecks = () => {
                 allCards.forEach(card => updateCardAppearance(card));
 
@@ -253,14 +250,14 @@
                                 messageEl.innerHTML = `<span class="font-bold text-green-600">OK (${data.status_code})</span>: <code class="text-slate-500">${data.url}</code>`;
                             } else {
                                 indicator.classList.add('bg-red-400');
-                                messageEl.innerHTML = `<span class="font-bold text-red-600">ERROR (${data.status_code})</span>: <code class="text-slate-500">${data.url}</code>`;
+                                 messageEl.innerHTML = `<span class="font-bold text-red-600">ERROR (${data.status_code})</span>: <code class="text-slate-500">${data.url}</code>`;
                             }
                         })
                         .catch(errorPromise => {
                             indicator.classList.remove('bg-slate-300');
                             indicator.classList.add('bg-red-400');
                             errorPromise.then(error => {
-                                messageEl.innerHTML = `<span class="font-bold text-red-600">FAIL</span>: <span class="text-slate-500">${error.detail || 'Could not connect'}</span>`;
+                                 messageEl.innerHTML = `<span class="font-bold text-red-600">FAIL</span>: <span class="text-slate-500">${error.detail || 'Could not connect'}</span>`;
                             }).catch(() => {
                                 messageEl.innerHTML = `<span class="font-bold text-red-600">FAIL</span>: <span class="text-slate-500">Failed to perform check</span>`;
                             });
@@ -272,10 +269,8 @@
                 });
             };
 
-            // Setup event listeners
             filterCheckbox.addEventListener('change', applyFilter);
 
-            // Listen for the page becoming visible again
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden) {
                     console.log("Tab focused. Refreshing backend status...");
@@ -284,7 +279,6 @@
                 }
             });
 
-            // Initial run on page load
             runAllHealthChecks();
         });
     </script>

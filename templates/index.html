@@ -48,7 +48,7 @@
                  data-status="{{ 'failing' if has_failed_condition else 'neutral' }}">
                 <!-- Card Header -->
                 <div class="p-6">
-                    <div class="flex justify-between items-start">
+                    <div class="flex justify-between items-baseline">
                         <h2 class="text-lg font-semibold text-zinc-900 truncate" title="{{ route.metadata.name }}">{{ route.metadata.name }}</h2>
                         <span class="text-xs text-zinc-500 ml-4 flex-shrink-0 text-right">
                            Namespace: {{ route.metadata.namespace }}
@@ -63,10 +63,21 @@
 
                 <!-- Card Body -->
                 <div class="px-6 pb-6 flex-grow space-y-5">
-                    <!-- === NEW: Special Owner Info Box === -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Hostnames</h3>
+                        <ul class="space-y-1">
+                            {% for hostname in route.spec.hostnames %}
+                            <li class="flex items-center">
+                                <a href="http://{{ hostname }}" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ hostname }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
                     {% if (route.metadata.annotations and 'owner/contact' in route.metadata.annotations) or (route.metadata.annotations and 'owner/link' in route.metadata.annotations) %}
                     <div>
-                        <div class="p-3 border border-zinc-200 rounded-xl bg-zinc-50 space-y-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Owner Info</h3>
+                        <div class="p-3 border border-zinc-200 rounded-xl bg-zinc-50/70 space-y-2">
                             {% if 'owner/contact' in route.metadata.annotations %}
                             <a href="mailto:{{ route.metadata.annotations['owner/contact'] }}" class="flex items-center text-sm text-indigo-600 hover:underline group">
                                 <svg class="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
@@ -84,26 +95,16 @@
                     {% endif %}
 
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Hostnames</h3>
-                        <ul class="space-y-1">
-                            {% for hostname in route.spec.hostnames %}
-                            <li class="flex items-center">
-                                <a href="http://{{ hostname }}" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ hostname }}</a>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    <div>
                         <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Rules</h3>
                         <div class="space-y-2">
                         {% for rule in route.spec.rules %}
-                            <div class="p-4 border border-zinc-200 rounded-xl bg-zinc-50">
+                            <div class="p-4 border border-zinc-200 rounded-xl bg-zinc-50/70">
                                 {% for match in rule.get('matches', []) %}
                                     <p class="text-sm font-medium text-zinc-800">Path: <code class="bg-zinc-200 px-1 py-0.5 rounded">{{ match.path.value }}</code></p>
                                 {% endfor %}
                                 {% for backend in rule.backendRefs %}
                                 <div class="flex items-center mt-2">
-                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0"></span>
+                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0" data-url="{{ backend.internal_url }}"></span>
                                     <p class="truncate text-sm text-zinc-600">
                                         Backend: <span class="font-medium text-zinc-800">{{ backend.name }}:{{ backend.port }}</span>
                                     </p>
@@ -115,14 +116,13 @@
                     </div>
                 </div>
 
-                <!-- Card Footer with metadata -->
                 <div class="bg-zinc-100/50 rounded-b-2xl px-6 py-5 mt-auto border-t border-zinc-200 space-y-5">
                     {% set other_annotations = route.metadata.annotations | rejectattr('key', 'in', ['kubernetes.io/description', 'owner/contact', 'owner/link']) | list %}
                     {% if other_annotations %}
                     <div>
                         <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
                         <div class="flex flex-wrap gap-1.5">
-                            {% for key, value in route.metadata.annotations.items() if key not in ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
+                            {% for key, value in other_annotations %}
                             <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
                                 <span class="font-semibold">{{ key }}</span>:
                                 {% if value.startswith('http') %}

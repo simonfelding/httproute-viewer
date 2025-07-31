@@ -2,3 +2,5 @@ fastapi
 uvicorn
 kubernetes
 jinja2
+httpx
+cachetools

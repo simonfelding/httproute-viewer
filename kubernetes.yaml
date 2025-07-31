@@ -63,8 +63,29 @@ spec:
         app: httproute-viewer
     spec:
       serviceAccountName: httproute-viewer
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: httproute-viewer
-        image: your-registry/your-repo/k8s-httproute-viewer:v1
+        image: ghcr.io/simonfelding/httproute-viewer:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - "ALL"
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"

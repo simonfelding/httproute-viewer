@@ -18,34 +18,46 @@
     <main class="container mx-auto px-6 py-8">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for route in http_routes %}
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-2">{{ route.metadata.name }}</h2>
-                <p class="text-gray-600 mb-4">Namespace: {{ route.metadata.namespace }}</p>
+            <div class="bg-white rounded-lg shadow-md p-6 flex flex-col">
+                <!-- Main route info -->
+                <div class="flex-grow">
+                    <h2 class="text-xl font-semibold mb-2">{{ route.metadata.name }}</h2>
+                    <p class="text-gray-600 mb-4">Namespace: {{ route.metadata.namespace }}</p>
 
-                <div class="mb-4">
-                    <h3 class="font-bold">Hostnames:</h3>
-                    <ul class="list-disc list-inside">
-                        {% for hostname in route.spec.hostnames %}
-                        <li>
-                            <a href="http://{{ hostname }}" target="_blank" class="text-blue-500 hover:underline">{{ hostname }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-
-                <div class="mb-4">
-                    <h3 class="font-bold">Rules:</h3>
-                    {% for rule in route.spec.rules %}
-                        <div class="mt-2 p-2 border rounded">
-                            {% for match in rule.get('matches', []) %}
-                                <p><strong>Path:</strong> {{ match.path.value }}</p>
+                    <div class="mb-4">
+                        <h3 class="font-bold">Hostnames:</h3>
+                        <!-- Changed to a div to better hold flex items -->
+                        <div class="space-y-1">
+                            {% for hostname in route.spec.hostnames %}
+                            <div class="flex items-center">
+                                <!-- Status indicator for each hostname -->
+                                <span class="status-indicator h-2 w-2 rounded-full bg-gray-400 mr-2"
+                                      data-url="https://{{ hostname }}"
+                                      title="Checking..."></span>
+                                <a href="https://{{ hostname }}" target="_blank" class="text-blue-500 hover:underline">{{ hostname }}</a>
+                            </div>
                             {% endfor %}
-                            <p><strong>Backend Service:</strong> {{ rule.backendRefs[0].name }}</p>
-                            <p><strong>Port:</strong> {{ rule.backendRefs[0].port }}</p>
                         </div>
-                    {% endfor %}
+                    </div>
+
+                    <!-- Rules, Labels, Annotations, Status sections are unchanged... -->
+                    <div class="mb-4">
+                        <h3 class="font-bold">Rules:</h3>
+                        {% for rule in route.spec.rules %}
+                            <div class="mt-2 p-2 border rounded bg-gray-50">
+                                {% for match in rule.get('matches', []) %}
+                                    <p><strong>Path:</strong> {{ match.path.value }}</p>
+                                {% endfor %}
+                                <p><strong>Backend Service:</strong> {{ rule.backendRefs[0].name }}</p>
+                                <p><strong>Port:</strong> {{ rule.backendRefs[0].port }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
 
+                <div class="mt-auto">
+                    <!-- Annotations, Labels, Status -->
+                </div>
             </div>
             {% else %}
             <p>No HTTPRoute resources found.</p>
@@ -53,5 +65,34 @@
         </div>
     </main>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const indicators = document.querySelectorAll('.status-indicator');
+
+            indicators.forEach(indicator => {
+                const url = indicator.dataset.url;
+                // Fetch status from our own API to bypass CORS
+                fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status_code >= 200 && data.status_code < 300) {
+                            indicator.classList.remove('bg-gray-400');
+                            indicator.classList.add('bg-green-500');
+                            indicator.title = `OK (${data.status_code})`;
+                        } else {
+                            indicator.classList.remove('bg-gray-400');
+                            indicator.classList.add('bg-red-500');
+                            indicator.title = `Error (${data.status_code})`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking status for', url, error);
+                        indicator.classList.remove('bg-gray-400');
+                        indicator.classList.add('bg-red-500');
+                        indicator.title = 'Failed to check status';
+                    });
+            });
+        });
+    </script>
 </body>
 </html>

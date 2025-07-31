@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes HTTPRoute Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <header class="bg-white shadow">
+        <div class="container mx-auto px-6 py-4">
+            <h1 class="text-2xl font-bold">HTTPRoute Viewer</h1>
+            <p class="text-sm text-gray-600">Accessed on: {{ hostname }}</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for route in http_routes %}
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-2">{{ route.metadata.name }}</h2>
+                <p class="text-gray-600 mb-4">Namespace: {{ route.metadata.namespace }}</p>
+
+                <div class="mb-4">
+                    <h3 class="font-bold">Hostnames:</h3>
+                    <ul class="list-disc list-inside">
+                        {% for hostname in route.spec.hostnames %}
+                        <li>
+                            <a href="http://{{ hostname }}" target="_blank" class="text-blue-500 hover:underline">{{ hostname }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="font-bold">Rules:</h3>
+                    {% for rule in route.spec.rules %}
+                        <div class="mt-2 p-2 border rounded">
+                            {% for match in rule.get('matches', []) %}
+                                <p><strong>Path:</strong> {{ match.path.value }}</p>
+                            {% endfor %}
+                            <p><strong>Backend Service:</strong> {{ rule.backendRefs[0].name }}</p>
+                            <p><strong>Port:</strong> {{ rule.backendRefs[0].port }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+            {% else %}
+            <p>No HTTPRoute resources found.</p>
+            {% endfor %}
+        </div>
+    </main>
+
+</body>
+</html>

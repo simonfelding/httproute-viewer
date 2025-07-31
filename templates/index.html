@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kubernetes HTTPRoute Viewer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/tailwind.css" rel="stylesheet">
     <style>
         /* Add a smooth transition for color and visibility changes */
         .card {
@@ -69,9 +69,8 @@
                                 {% endfor %}
                                 {% for backend in rule.backendRefs %}
                                 <div class="flex items-center mt-1">
-                                    <span class="status-indicator h-2.5 w-2.5 rounded-full bg-slate-400 mr-2 flex-shrink-0"
-                                          data-url="{{ backend.internal_url }}"
-                                          title="Checking...">
+                                    <span class="status-indicator h-2.5 w-2.5 rounded-full bg-slate-300 mr-2 flex-shrink-0"
+                                          data-url="{{ backend.internal_url }}">
                                     </span>
                                     <p class="truncate text-sm">
                                         <strong>Backend:</strong> {{ backend.name }}:{{ backend.port }}
@@ -84,7 +83,34 @@
                 </div>
 
                 <!-- Wrapper for all bottom metadata -->
-                <div class="mt-auto">
+                <div class="mt-auto pt-4 border-t border-slate-200">
+                    <!-- Labels and Annotations -->
+                    {% if route.metadata.annotations %}
+                    <div class="mb-4">
+                        <h3 class="font-bold text-sm">Annotations:</h3>
+                        <div class="flex flex-wrap gap-1 mt-2">
+                            {% for key, value in route.metadata.annotations.items() %}
+                            <div class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full truncate" title="{{ key }}: {{ value }}">
+                                <span class="font-semibold">{{ key }}</span>: {{ value }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if route.metadata.labels %}
+                    <div class="mb-4">
+                        <h3 class="font-bold text-sm">Labels:</h3>
+                        <div class="flex flex-wrap gap-1 mt-2">
+                            {% for key, value in route.metadata.labels.items() %}
+                            <div class="bg-slate-200 text-slate-800 text-xs font-medium px-2 py-1 rounded-full truncate" title="{{ key }}: {{ value }}">
+                                <span class="font-semibold">{{ key }}</span>: {{ value }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Gateway Status -->
                     {% if route.status and route.status.parents %}
                     <div class="pt-4 border-t border-slate-200">
                         {% for parent in route.status.parents %}
@@ -106,6 +132,18 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+
+                    <!-- Backend Health Status Section -->
+                    <div class="pt-4 border-t border-slate-200">
+                        <h3 class="font-bold text-sm mb-1">Backend Health</h3>
+                        {% for rule in route.spec.rules %}
+                            {% for backend in rule.backendRefs %}
+                                <div class="status-message text-xs" data-url="{{ backend.internal_url }}">
+                                    <span class="text-slate-500">Checking...</span>
+                                </div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
             {% else %}
@@ -119,7 +157,6 @@
             const filterCheckbox = document.getElementById('filter-checkbox');
             const allCards = document.querySelectorAll('.card[data-status]');
 
-            // --- Card Appearance and Status Logic ---
             const updateCardAppearance = (card) => {
                 const status = card.dataset.status;
                 card.classList.remove('bg-slate-50', 'border-transparent', 'bg-blue-100', 'border-blue-400', 'bg-red-100', 'border-red-400');
@@ -133,69 +170,27 @@
             };
 
             const updateCardStatus = (card) => {
-                // If a card is already failing from a gateway condition, it can't be improved.
-                if (card.dataset.status === 'failing') {
-                    updateCardAppearance(card);
-                    return;
-                }
-
-                const indicators = card.querySelectorAll('.status-indicator');
-                const statuses = Array.from(indicators).map(ind => {
-                    if (ind.classList.contains('bg-green-500')) return 'success';
-                    if (ind.classList.contains('bg-red-500')) return 'failing';
-                    return 'neutral';
-                });
-
-                if (statuses.includes('failing')) {
-                    card.dataset.status = 'failing';
-                } else if (statuses.includes('neutral')) {
-                    card.dataset.status = 'neutral';
+                if (card.dataset.status === 'failing' && !card.querySelector('.status-indicator.bg-red-400')) {
+                    // Don't override a failure from gateway conditions
                 } else {
-                    card.dataset.status = 'success';
+                     const indicators = card.querySelectorAll('.status-indicator');
+                    const statuses = Array.from(indicators).map(ind => {
+                        if (ind.classList.contains('bg-green-400')) return 'success';
+                        if (ind.classList.contains('bg-red-400')) return 'failing';
+                        return 'neutral';
+                    });
+
+                    if (statuses.includes('failing')) {
+                        card.dataset.status = 'failing';
+                    } else if (statuses.every(s => s === 'success')) {
+                        card.dataset.status = 'success';
+                    } else {
+                        card.dataset.status = 'neutral';
+                    }
                 }
                 updateCardAppearance(card);
             };
 
-            // Initialize appearance for cards that are pre-failed
-            allCards.forEach(updateCardAppearance);
-
-            // --- Health Check Logic ---
-            const indicators = document.querySelectorAll('.status-indicator');
-            indicators.forEach(indicator => {
-                const url = indicator.dataset.url;
-                if (!url) {
-                    indicator.classList.add('hidden'); // Hide dot if no URL
-                    return;
-                }
-                const card = indicator.closest('.card[data-status]');
-
-                fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
-                    .then(response => response.ok ? response.json() : Promise.reject(response))
-                    .then(data => {
-                        indicator.classList.remove('bg-slate-400');
-                        if (data.status_code >= 200 && data.status_code < 300) {
-                            indicator.classList.add('bg-green-500');
-                            indicator.title = `OK (${data.status_code}) on ${data.url}`;
-                        } else {
-                            indicator.classList.add('bg-red-500');
-                            indicator.title = `Error (${data.status_code}) on ${data.url}`;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking status for', url, error);
-                        indicator.classList.remove('bg-slate-400');
-                        indicator.classList.add('bg-red-500');
-                        indicator.title = 'Failed to check status';
-                    })
-                    .finally(() => {
-                        // After each check, re-evaluate the parent card's overall status
-                        updateCardStatus(card);
-                        // Re-apply the filter in case the card's state just changed
-                        applyFilter();
-                    });
-            });
-
-            // --- Filter Logic ---
             const applyFilter = () => {
                 const showOnlyFailing = filterCheckbox.checked;
                 allCards.forEach(card => {
@@ -208,7 +203,80 @@
                 });
             };
 
+            // Function to reset UI before a refresh
+            const resetUIForRefresh = () => {
+                document.querySelectorAll('.status-indicator').forEach(indicator => {
+                    indicator.classList.remove('bg-green-400', 'bg-red-400');
+                    indicator.classList.add('bg-slate-300');
+                });
+                 document.querySelectorAll('.status-message').forEach(messageEl => {
+                    messageEl.innerHTML = `<span class="text-slate-500">Checking...</span>`;
+                });
+                allCards.forEach(card => {
+                     // Only reset card status if it wasn't pre-failed by a gateway condition
+                    if (!card.innerHTML.includes('text-red-500')) {
+                        card.dataset.status = 'neutral';
+                    }
+                    updateCardAppearance(card);
+                });
+            };
+
+            // Encapsulated function to run all health checks
+            const runAllHealthChecks = () => {
+                allCards.forEach(card => updateCardAppearance(card));
+
+                const indicators = document.querySelectorAll('.status-indicator');
+                indicators.forEach(indicator => {
+                    const url = indicator.dataset.url;
+                    if (!url) {
+                        indicator.classList.add('hidden');
+                        return;
+                    }
+                    const card = indicator.closest('.card[data-status]');
+                    const messageEl = card.querySelector(`.status-message[data-url="${url}"]`);
+
+                    fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
+                        .then(response => response.ok ? response.json() : Promise.reject(response.json()))
+                        .then(data => {
+                            indicator.classList.remove('bg-slate-300');
+                            if (data.status_code >= 200 && data.status_code < 300) {
+                                indicator.classList.add('bg-green-400');
+                                messageEl.innerHTML = `<span class="font-bold text-green-600">OK (${data.status_code})</span>: <code class="text-slate-500">${data.url}</code>`;
+                            } else {
+                                indicator.classList.add('bg-red-400');
+                                messageEl.innerHTML = `<span class="font-bold text-red-600">ERROR (${data.status_code})</span>: <code class="text-slate-500">${data.url}</code>`;
+                            }
+                        })
+                        .catch(errorPromise => {
+                            indicator.classList.remove('bg-slate-300');
+                            indicator.classList.add('bg-red-400');
+                            errorPromise.then(error => {
+                                messageEl.innerHTML = `<span class="font-bold text-red-600">FAIL</span>: <span class="text-slate-500">${error.detail || 'Could not connect'}</span>`;
+                            }).catch(() => {
+                                messageEl.innerHTML = `<span class="font-bold text-red-600">FAIL</span>: <span class="text-slate-500">Failed to perform check</span>`;
+                            });
+                        })
+                        .finally(() => {
+                            updateCardStatus(card);
+                            applyFilter();
+                        });
+                });
+            };
+
+            // Setup event listeners
             filterCheckbox.addEventListener('change', applyFilter);
+
+            // Listen for the page becoming visible again
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    console.log("Tab focused. Refreshing backend status...");
+                    resetUIForRefresh();
+                    runAllHealthChecks();
+                }
+            });
+
+            // Initial run on page load
+            runAllHealthChecks();
         });
     </script>
 </body>

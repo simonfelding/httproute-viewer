@@ -245,7 +245,7 @@
                         .then(response => response.ok ? response.json() : Promise.reject(response.json()))
                         .then(data => {
                             indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
-                            if (data.status_code >= 200 && data.status_code < 300) {
+                            if (data.status_code < 500 && data.status_code != 404) {
                                 indicator.classList.add('bg-emerald-500');
                                 messageEl.innerHTML = `<span class="font-semibold text-emerald-700">OK (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
                             } else {

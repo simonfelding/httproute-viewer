@@ -1,5 +1,5 @@
 FROM alpine:latest AS builder
-RUN apk add --no-cache curl && curl -o tailwind.css https://unpkg.com/tailwindcss@^3/dist/tailwind.min.css
+RUN apk add --no-cache curl && curl -Lo tailwind.css https://unpkg.com/tailwindcss@^3/dist/tailwind.min.css
 
 FROM python:3.13-alpine AS main
 

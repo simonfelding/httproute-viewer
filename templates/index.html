@@ -116,25 +116,36 @@
                     </div>
                 </div>
 
+                <!-- Card Footer with metadata -->
                 <div class="bg-zinc-100/50 rounded-b-2xl px-6 py-5 mt-auto border-t border-zinc-200 space-y-5">
-                    {% set other_annotations = route.metadata.annotations | rejectattr('key', 'in', ['kubernetes.io/description', 'owner/contact', 'owner/link']) | list %}
-                    {% if other_annotations %}
-                    <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
-                        <div class="flex flex-wrap gap-1.5">
-                            {% for key, value in other_annotations %}
-                            <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
-                                <span class="font-semibold">{{ key }}</span>:
-                                {% if value.startswith('http') %}
-                                    <a href="{{ value }}" target="_blank" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
-                                {% else %}
-                                    <span class="opacity-80">{{ value }}</span>
-                                {% endif %}
+                    {% if route.metadata.annotations %}
+                        {% set excluded_keys = ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
+                        {% set other_annotations = [] %}
+                        {% for key, value in route.metadata.annotations.items() %}
+                            {% if key not in excluded_keys %}
+                                {% do other_annotations.append((key, value)) %}
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if other_annotations %}
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
+                            <div class="flex flex-wrap gap-1.5">
+                                {% for key, value in other_annotations %}
+                                <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
+                                    <span class="font-semibold">{{ key }}</span>:
+                                    {% if value.startswith('http') %}
+                                        <a href="{{ value }}" target="_blank" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
+                                    {% else %}
+                                        <span class="opacity-80">{{ value }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
                         </div>
-                    </div>
+                        {% endif %}
                     {% endif %}
+
                     {% if route.metadata.labels %}
                     <div>
                         <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Labels</h3>

@@ -5,58 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kubernetes HTTPRoute Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Add a smooth transition for color and visibility changes */
+        .card {
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-slate-100 text-slate-800">
 
-    <header class="bg-white shadow">
-        <div class="container mx-auto px-6 py-4">
-            <h1 class="text-2xl font-bold">HTTPRoute Viewer</h1>
-            <p class="text-sm text-gray-600">Accessed on: {{ hostname }}</p>
+    <header class="bg-slate-50 shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">HTTPRoute Viewer</h1>
+                <p class="text-sm text-slate-500">Accessed on: {{ hostname }}</p>
+            </div>
+            <!-- Filter Checkbox -->
+            <div class="flex items-center">
+                <label for="filter-checkbox" class="text-sm font-medium text-slate-700 mr-2">Show only failing</label>
+                <input id="filter-checkbox" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+            </div>
         </div>
     </header>
 
     <main class="container mx-auto px-6 py-8">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for route in http_routes %}
-            <div class="bg-white rounded-lg shadow-md p-6 flex flex-col">
+            {% set has_failed_condition = false %}
+            {% if route.status and route.status.parents %}
+              {% for parent in route.status.parents %}
+                {% for condition in parent.conditions %}
+                  {% if condition.status != 'True' %}
+                    {% set has_failed_condition = true %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endif %}
+
+            <div class="card bg-slate-50 rounded-lg shadow-md p-6 flex flex-col border border-transparent"
+                 data-status="{{ 'failing' if has_failed_condition else 'neutral' }}">
                 <!-- Main route info -->
                 <div class="flex-grow">
                     <h2 class="text-xl font-semibold mb-2">{{ route.metadata.name }}</h2>
-                    <p class="text-gray-600 mb-4">Namespace: {{ route.metadata.namespace }}</p>
+                    <p class="text-slate-500 mb-4">Namespace: {{ route.metadata.namespace }}</p>
 
                     <div class="mb-4">
                         <h3 class="font-bold">Hostnames:</h3>
-                        <!-- Changed to a div to better hold flex items -->
-                        <div class="space-y-1">
+                        <ul class="list-disc list-inside text-slate-600">
                             {% for hostname in route.spec.hostnames %}
-                            <div class="flex items-center">
-                                <!-- Status indicator for each hostname -->
-                                <span class="status-indicator h-2 w-2 rounded-full bg-gray-400 mr-2"
-                                      data-url="https://{{ hostname }}"
-                                      title="Checking..."></span>
-                                <a href="https://{{ hostname }}" target="_blank" class="text-blue-500 hover:underline">{{ hostname }}</a>
-                            </div>
+                            <li>
+                                <a href="http://{{ hostname }}" target="_blank" class="text-blue-600 hover:underline">{{ hostname }}</a>
+                            </li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
 
-                    <!-- Rules, Labels, Annotations, Status sections are unchanged... -->
                     <div class="mb-4">
                         <h3 class="font-bold">Rules:</h3>
                         {% for rule in route.spec.rules %}
-                            <div class="mt-2 p-2 border rounded bg-gray-50">
+                            <div class="mt-2 p-3 border border-slate-200 rounded bg-slate-100/50">
                                 {% for match in rule.get('matches', []) %}
-                                    <p><strong>Path:</strong> {{ match.path.value }}</p>
+                                    <p class="text-sm"><strong>Path:</strong> {{ match.path.value }}</p>
                                 {% endfor %}
-                                <p><strong>Backend Service:</strong> {{ rule.backendRefs[0].name }}</p>
-                                <p><strong>Port:</strong> {{ rule.backendRefs[0].port }}</p>
+                                {% for backend in rule.backendRefs %}
+                                <div class="flex items-center mt-1">
+                                    <span class="status-indicator h-2.5 w-2.5 rounded-full bg-slate-400 mr-2 flex-shrink-0"
+                                          data-url="{{ backend.internal_url }}"
+                                          title="Checking...">
+                                    </span>
+                                    <p class="truncate text-sm">
+                                        <strong>Backend:</strong> {{ backend.name }}:{{ backend.port }}
+                                    </p>
+                                </div>
+                                {% endfor %}
                             </div>
                         {% endfor %}
                     </div>
                 </div>
 
+                <!-- Wrapper for all bottom metadata -->
                 <div class="mt-auto">
-                    <!-- Annotations, Labels, Status -->
+                    {% if route.status and route.status.parents %}
+                    <div class="pt-4 border-t border-slate-200">
+                        {% for parent in route.status.parents %}
+                        <div class="mb-2">
+                            <h3 class="font-bold text-sm">Gateway: <span class="font-normal text-slate-600">{{ parent.parentRef.namespace }}/{{ parent.parentRef.name }}</span></h3>
+                            <table class="w-full text-left text-xs mt-1">
+                                <tbody>
+                                {% for condition in parent.conditions %}
+                                    <tr class="text-slate-700">
+                                        <td class="w-4 pr-2 {% if condition.status == 'True' %}text-green-500{% else %}text-red-500{% endif %}">
+                                            ●
+                                        </td>
+                                        <td>{{ condition.message }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -67,31 +116,99 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const indicators = document.querySelectorAll('.status-indicator');
+            const filterCheckbox = document.getElementById('filter-checkbox');
+            const allCards = document.querySelectorAll('.card[data-status]');
 
+            // --- Card Appearance and Status Logic ---
+            const updateCardAppearance = (card) => {
+                const status = card.dataset.status;
+                card.classList.remove('bg-slate-50', 'border-transparent', 'bg-blue-100', 'border-blue-400', 'bg-red-100', 'border-red-400');
+                if (status === 'success') {
+                    card.classList.add('bg-blue-100', 'border-blue-400');
+                } else if (status === 'failing') {
+                    card.classList.add('bg-red-100', 'border-red-400');
+                } else {
+                    card.classList.add('bg-slate-50', 'border-transparent');
+                }
+            };
+
+            const updateCardStatus = (card) => {
+                // If a card is already failing from a gateway condition, it can't be improved.
+                if (card.dataset.status === 'failing') {
+                    updateCardAppearance(card);
+                    return;
+                }
+
+                const indicators = card.querySelectorAll('.status-indicator');
+                const statuses = Array.from(indicators).map(ind => {
+                    if (ind.classList.contains('bg-green-500')) return 'success';
+                    if (ind.classList.contains('bg-red-500')) return 'failing';
+                    return 'neutral';
+                });
+
+                if (statuses.includes('failing')) {
+                    card.dataset.status = 'failing';
+                } else if (statuses.includes('neutral')) {
+                    card.dataset.status = 'neutral';
+                } else {
+                    card.dataset.status = 'success';
+                }
+                updateCardAppearance(card);
+            };
+
+            // Initialize appearance for cards that are pre-failed
+            allCards.forEach(updateCardAppearance);
+
+            // --- Health Check Logic ---
+            const indicators = document.querySelectorAll('.status-indicator');
             indicators.forEach(indicator => {
                 const url = indicator.dataset.url;
-                // Fetch status from our own API to bypass CORS
+                if (!url) {
+                    indicator.classList.add('hidden'); // Hide dot if no URL
+                    return;
+                }
+                const card = indicator.closest('.card[data-status]');
+
                 fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
-                    .then(response => response.json())
+                    .then(response => response.ok ? response.json() : Promise.reject(response))
                     .then(data => {
+                        indicator.classList.remove('bg-slate-400');
                         if (data.status_code >= 200 && data.status_code < 300) {
-                            indicator.classList.remove('bg-gray-400');
                             indicator.classList.add('bg-green-500');
-                            indicator.title = `OK (${data.status_code})`;
+                            indicator.title = `OK (${data.status_code}) on ${data.url}`;
                         } else {
-                            indicator.classList.remove('bg-gray-400');
                             indicator.classList.add('bg-red-500');
-                            indicator.title = `Error (${data.status_code})`;
+                            indicator.title = `Error (${data.status_code}) on ${data.url}`;
                         }
                     })
                     .catch(error => {
                         console.error('Error checking status for', url, error);
-                        indicator.classList.remove('bg-gray-400');
+                        indicator.classList.remove('bg-slate-400');
                         indicator.classList.add('bg-red-500');
                         indicator.title = 'Failed to check status';
+                    })
+                    .finally(() => {
+                        // After each check, re-evaluate the parent card's overall status
+                        updateCardStatus(card);
+                        // Re-apply the filter in case the card's state just changed
+                        applyFilter();
                     });
             });
+
+            // --- Filter Logic ---
+            const applyFilter = () => {
+                const showOnlyFailing = filterCheckbox.checked;
+                allCards.forEach(card => {
+                    const isFailing = card.dataset.status === 'failing';
+                    if (showOnlyFailing && !isFailing) {
+                        card.classList.add('hidden');
+                    } else {
+                        card.classList.remove('hidden');
+                    }
+                });
+            };
+
+            filterCheckbox.addEventListener('change', applyFilter);
         });
     </script>
 </body>

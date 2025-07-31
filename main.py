@@ -1,6 +1,4 @@
-import os
 import httpx
-from urllib.parse import urlparse
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -10,9 +8,6 @@ from cachetools import cached, TTLCache
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# --- Caching ---
-# Create a cache that holds 1 item and expires after 5 seconds.
-# This ensures we don't spam the Kubernetes API on every check.
 api_cache = TTLCache(maxsize=1, ttl=5)
 
 def get_kubernetes_api():
@@ -27,30 +22,51 @@ def get_kubernetes_api():
     return client.CustomObjectsApi()
 
 @cached(api_cache)
-def get_http_routes():
+def get_prepared_routes_and_urls():
     """
-    Fetches all HTTPRoute resources from the cluster.
-    The result is cached for 60 seconds to improve performance.
+    Fetches HTTPRoutes, processes them to include internal URLs, and returns
+    both the processed routes and a set of valid URLs for checking.
+    This entire operation is cached.
     """
-    print("CACHE MISS: Fetching HTTPRoutes from Kubernetes API...")
+    print("CACHE MISS: Fetching and preparing routes from Kubernetes API...")
     api = get_kubernetes_api()
     try:
         group = "gateway.networking.k8s.io"
         version = "v1"
         plural = "httproutes"
-        return api.list_cluster_custom_object(group, version, plural)
+        http_routes = api.list_cluster_custom_object(group, version, plural)
     except client.ApiException as e:
-        # If the CRD isn't found, return an empty list.
         if e.status == 404:
-            return {"items": []}
-        raise e
+            http_routes = {"items": []}
+        else:
+            raise e
+
+    route_items = http_routes.get("items", [])
+    allowed_urls = set()
+
+    for route in route_items:
+        route_namespace = route["metadata"]["namespace"]
+        for rule in route.get("spec", {}).get("rules", []):
+            for backend in rule.get("backendRefs", []):
+                service_name = backend.get("name")
+                service_port = backend.get("port")
+                service_namespace = backend.get("namespace", route_namespace)
+
+                if service_name and service_port:
+                    internal_url = f"http://{service_name}.{service_namespace}:{service_port}"
+                    backend["internal_url"] = internal_url
+                    allowed_urls.add(internal_url)
+
+    return route_items, allowed_urls
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    """Handles the main page request, using a cached list of routes."""
-    http_routes = get_http_routes()
-    route_items = http_routes.get("items", [])
-    sorted_routes = sorted(route_items, key=lambda r: r['metadata']['name'])
+    """Handles the main page request using the cached and processed data."""
+
+    processed_routes, _ = get_prepared_routes_and_urls()
+
+    sorted_routes = sorted(processed_routes, key=lambda r: r['metadata']['name'])
     hostname = request.headers.get("host")
 
     return templates.TemplateResponse(
@@ -65,35 +81,22 @@ async def read_root(request: Request):
 @app.get("/api/check-status")
 async def check_status(url: str):
     """
-    Checks the status of a URL, but only if its hostname is present in an
-    HTTPRoute resource.
+    Checks an internal URL's status, using the cached set of allowed URLs
+    for validation.
     """
-    # 1. Get all allowed hostnames from the cached list of routes
-    http_routes = get_http_routes()
-    allowed_hostnames = set()
-    for route in http_routes.get("items", []):
-        for hostname in route.get("spec", {}).get("hostnames", []):
-            allowed_hostnames.add(hostname)
+    # We only need the set of allowed URLs here, so we ignore the first value.
+    _, allowed_internal_urls = get_prepared_routes_and_urls()
 
-    # 2. Validate the requested URL
-    try:
-        parsed_url = urlparse(url)
-        if not parsed_url.hostname or not parsed_url.scheme:
-             raise HTTPException(status_code=400, detail="Invalid URL format provided.")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Could not parse the provided URL.")
-
-    if parsed_url.hostname not in allowed_hostnames:
+    if url not in allowed_internal_urls:
         raise HTTPException(
             status_code=400,
-            detail=f"Hostname '{parsed_url.hostname}' not found in any HTTPRoute resource."
+            detail=f"URL '{url}' is not a valid backend defined in any HTTPRoute."
         )
 
-    # 3. If valid, proceed with the accessibility check
     timeout = httpx.Timeout(5.0)
     try:
-        async with httpx.AsyncClient(verify=False, timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, follow_redirects=True)
-            return JSONResponse({"status_code": response.status_code})
+            return JSONResponse({"status_code": response.status_code, "url": url})
     except httpx.RequestError as e:
-        return JSONResponse({"status_code": 503, "error": str(e)}, status_code=503)
+        return JSONResponse({"status_code": 503, "error": str(e), "url": url}, status_code=503)

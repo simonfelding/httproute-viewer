@@ -6,7 +6,6 @@
     <title>Kubernetes HTTPRoute Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* A slightly more pronounced but still soft shadow for cards */
         .card {
             transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
             box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
@@ -16,9 +15,9 @@
         }
     </style>
 </head>
-<body class="bg-zinc-50 text-zinc-700">
+<body class="bg-zinc-100 text-zinc-800">
 
-    <header class="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-10 border-b border-zinc-200">
+    <header class="bg-white/90 backdrop-blur-lg shadow-sm sticky top-0 z-10 border-b border-zinc-200">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
             <div>
                 <h1 class="text-xl font-bold text-zinc-900">HTTPRoute Viewer</h1>
@@ -32,7 +31,7 @@
     </header>
 
     <main class="container mx-auto px-6 py-8">
-        <div id="card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {% for route in http_routes %}
             {% set has_failed_condition = false %}
             {% if route.status and route.status.parents %}
@@ -45,49 +44,68 @@
               {% endfor %}
             {% endif %}
 
-            <div class="card bg-white rounded-xl flex flex-col border"
+            <div class="card bg-white rounded-2xl flex flex-col border"
                  data-status="{{ 'failing' if has_failed_condition else 'neutral' }}">
                 <!-- Card Header -->
-                <div class="p-5">
+                <div class="p-6">
                     <div class="flex justify-between items-start">
                         <h2 class="text-lg font-semibold text-zinc-900 truncate" title="{{ route.metadata.name }}">{{ route.metadata.name }}</h2>
                         <span class="text-xs text-zinc-500 ml-4 flex-shrink-0 text-right">
-                           {{ route.metadata.namespace }}
+                           Namespace: {{ route.metadata.namespace }}
                         </span>
                     </div>
                     {% if route.metadata.annotations and 'kubernetes.io/description' in route.metadata.annotations %}
-                    <p class="text-sm text-zinc-500 italic mt-1">
+                    <p class="text-sm text-zinc-600 italic mt-1.5">
                         {{ route.metadata.annotations['kubernetes.io/description'] }}
                     </p>
                     {% endif %}
                 </div>
 
                 <!-- Card Body -->
-                <div class="px-5 pb-5 flex-grow space-y-4">
+                <div class="px-6 pb-6 flex-grow space-y-5">
+                    <!-- === NEW: Special Owner Info Box === -->
+                    {% if (route.metadata.annotations and 'owner/contact' in route.metadata.annotations) or (route.metadata.annotations and 'owner/link' in route.metadata.annotations) %}
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Hostnames</h3>
+                        <div class="p-3 border border-zinc-200 rounded-xl bg-zinc-50 space-y-2">
+                            {% if 'owner/contact' in route.metadata.annotations %}
+                            <a href="mailto:{{ route.metadata.annotations['owner/contact'] }}" class="flex items-center text-sm text-indigo-600 hover:underline group">
+                                <svg class="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                {{ route.metadata.annotations['owner/contact'] }}
+                            </a>
+                            {% endif %}
+                            {% if 'owner/link' in route.metadata.annotations %}
+                            <a href="{{ route.metadata.annotations['owner/link'] }}" target="_blank" class="flex items-center text-sm text-indigo-600 hover:underline group">
+                                <svg class="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                {{ route.metadata.annotations['owner/link'] }}
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Hostnames</h3>
                         <ul class="space-y-1">
                             {% for hostname in route.spec.hostnames %}
                             <li class="flex items-center">
-                                <a href="http://{{ hostname }}" target="_blank" class="text-sm text-indigo-600 hover:underline">{{ hostname }}</a>
+                                <a href="http://{{ hostname }}" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ hostname }}</a>
                             </li>
                             {% endfor %}
                         </ul>
                     </div>
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Rules</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Rules</h3>
                         <div class="space-y-2">
                         {% for rule in route.spec.rules %}
-                            <div class="p-3 border border-zinc-200 rounded-lg bg-zinc-50">
+                            <div class="p-4 border border-zinc-200 rounded-xl bg-zinc-50">
                                 {% for match in rule.get('matches', []) %}
-                                    <p class="text-sm font-medium text-zinc-700"><strong>Path:</strong> {{ match.path.value }}</p>
+                                    <p class="text-sm font-medium text-zinc-800">Path: <code class="bg-zinc-200 px-1 py-0.5 rounded">{{ match.path.value }}</code></p>
                                 {% endfor %}
                                 {% for backend in rule.backendRefs %}
-                                <div class="flex items-center mt-1">
-                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0"
-                                          data-url="{{ backend.internal_url }}"></span>
+                                <div class="flex items-center mt-2">
+                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0"></span>
                                     <p class="truncate text-sm text-zinc-600">
-                                        <strong>Backend:</strong> {{ backend.name }}:{{ backend.port }}
+                                        Backend: <span class="font-medium text-zinc-800">{{ backend.name }}:{{ backend.port }}</span>
                                     </p>
                                 </div>
                                 {% endfor %}
@@ -98,14 +116,20 @@
                 </div>
 
                 <!-- Card Footer with metadata -->
-                <div class="bg-zinc-50/70 rounded-b-xl px-5 py-4 mt-auto border-t border-zinc-200 space-y-4">
-                    {% if route.metadata.annotations and (route.metadata.annotations | length > 1 or 'kubernetes.io/description' not in route.metadata.annotations) %}
+                <div class="bg-zinc-100/50 rounded-b-2xl px-6 py-5 mt-auto border-t border-zinc-200 space-y-5">
+                    {% set other_annotations = route.metadata.annotations | rejectattr('key', 'in', ['kubernetes.io/description', 'owner/contact', 'owner/link']) | list %}
+                    {% if other_annotations %}
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Annotations</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
                         <div class="flex flex-wrap gap-1.5">
-                            {% for key, value in route.metadata.annotations.items() if key != 'kubernetes.io/description' %}
-                            <div class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full" title="{{ key }}: {{ value }}">
-                                <span class="font-semibold">{{ key }}</span>: <span class="opacity-80">{{ value }}</span>
+                            {% for key, value in route.metadata.annotations.items() if key not in ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
+                            <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
+                                <span class="font-semibold">{{ key }}</span>:
+                                {% if value.startswith('http') %}
+                                    <a href="{{ value }}" target="_blank" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
+                                {% else %}
+                                    <span class="opacity-80">{{ value }}</span>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
@@ -113,10 +137,10 @@
                     {% endif %}
                     {% if route.metadata.labels %}
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Labels</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Labels</h3>
                         <div class="flex flex-wrap gap-1.5">
                             {% for key, value in route.metadata.labels.items() %}
-                            <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-0.5 rounded-full" title="{{ key }}: {{ value }}">
+                            <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
                                 <span class="font-semibold">{{ key }}</span>: <span class="opacity-80">{{ value }}</span>
                             </div>
                             {% endfor %}
@@ -125,13 +149,13 @@
                     {% endif %}
                     {% if route.status and route.status.parents %}
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Gateway Status</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Gateway Status</h3>
                         {% for parent in route.status.parents %}
-                        <div class="space-y-1">
-                            <p class="text-sm font-medium text-zinc-700">{{ parent.parentRef.namespace }}/{{ parent.parentRef.name }}</p>
+                        <div class="space-y-1 text-sm">
+                            <p class="font-medium text-zinc-800">{{ parent.parentRef.namespace }}/{{ parent.parentRef.name }}</p>
                             {% for condition in parent.conditions %}
                                 <div class="flex items-center text-xs">
-                                    <span class="w-4 pr-2 {% if condition.status == 'True' %}text-teal-500{% else %}text-rose-500{% endif %}">●</span>
+                                    <span class="w-4 pr-1.5 {% if condition.status == 'True' %}text-emerald-500{% else %}text-rose-500{% endif %}">●</span>
                                     <span class="text-zinc-600">{{ condition.message }}</span>
                                 </div>
                             {% endfor %}
@@ -140,11 +164,11 @@
                     </div>
                     {% endif %}
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Backend Health</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Backend Health</h3>
                         <div class="space-y-1">
                         {% for rule in route.spec.rules %}
                             {% for backend in rule.backendRefs %}
-                                <div class="status-message text-xs" data-url="{{ backend.internal_url }}"></div>
+                                <div class="status-message text-sm" data-url="{{ backend.internal_url }}"></div>
                             {% endfor %}
                         {% endfor %}
                         </div>
@@ -160,31 +184,28 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const filterCheckbox = document.getElementById('filter-checkbox');
-            const allCards = document.querySelectorAll('.card[data-status]');
 
             const updateCardAppearance = (card) => {
                 const status = card.dataset.status;
-                // Reset classes first
-                card.classList.remove('bg-white', 'border-transparent', 'bg-teal-50', 'border-teal-400', 'bg-rose-50', 'border-rose-400');
+                card.classList.remove('bg-white', 'border-zinc-200', 'bg-emerald-50', 'border-emerald-300', 'bg-rose-50', 'border-rose-300');
                 if (status === 'success') {
-                    card.classList.add('bg-teal-50', 'border-teal-400');
+                    card.classList.add('bg-emerald-50', 'border-emerald-300');
                 } else if (status === 'failing') {
-                    card.classList.add('bg-rose-50', 'border-rose-400');
+                    card.classList.add('bg-rose-50', 'border-rose-300');
                 } else {
-                    card.classList.add('bg-white', 'border-transparent');
+                    card.classList.add('bg-white', 'border-zinc-200');
                 }
             };
 
             const updateCardStatus = (card) => {
-                // If already failing from gateway condition, it stays failing.
                 if (card.dataset.status === 'failing' && !card.querySelector('.status-indicator.bg-rose-500')) {
-                    updateCardAppearance(card); // Ensure style is applied
+                    updateCardAppearance(card);
                     return;
                 }
 
                 const indicators = card.querySelectorAll('.status-indicator');
                 const statuses = Array.from(indicators).map(ind => {
-                    if (ind.classList.contains('bg-teal-500')) return 'success';
+                    if (ind.classList.contains('bg-emerald-500')) return 'success';
                     if (ind.classList.contains('bg-rose-500')) return 'failing';
                     return 'neutral';
                 });
@@ -207,21 +228,6 @@
                 });
             };
 
-            const resetUIForRefresh = () => {
-                 document.querySelectorAll('.status-indicator').forEach(indicator => {
-                    indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0 bg-zinc-300 animate-pulse';
-                });
-                document.querySelectorAll('.status-message').forEach(messageEl => {
-                    messageEl.innerHTML = `<span class="text-zinc-400">Checking...</span>`;
-                });
-                allCards.forEach(card => {
-                    if (!card.querySelector('.text-rose-500')) {
-                        card.dataset.status = 'neutral';
-                    }
-                    updateCardAppearance(card);
-                });
-            };
-
             const runAllHealthChecks = () => {
                 document.querySelectorAll('.status-indicator').forEach(indicator => {
                     const url = indicator.dataset.url;
@@ -233,27 +239,26 @@
                     const card = indicator.closest('.card');
                     const messageEl = card.querySelector(`.status-message[data-url="${url}"]`);
                     indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0 bg-zinc-300 animate-pulse';
-                    messageEl.innerHTML = `<span class="text-zinc-400">Checking...</span>`;
-
+                    messageEl.innerHTML = `<span class="text-zinc-500">Checking...</span>`;
 
                     fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
                         .then(response => response.ok ? response.json() : Promise.reject(response.json()))
                         .then(data => {
-                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0'; // Clear animation
-                            if (data.status_code < 500 && data.status_code != 404) {
-                                indicator.classList.add('bg-teal-500');
-                                messageEl.innerHTML = `<span class="font-bold text-teal-600">OK (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
+                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
+                            if (data.status_code >= 200 && data.status_code < 300) {
+                                indicator.classList.add('bg-emerald-500');
+                                messageEl.innerHTML = `<span class="font-semibold text-emerald-700">OK (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
                             } else {
                                 indicator.classList.add('bg-rose-500');
-                                messageEl.innerHTML = `<span class="font-bold text-rose-600">ERROR (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
+                                messageEl.innerHTML = `<span class="font-semibold text-rose-700">ERROR (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
                             }
                         })
                         .catch(errorPromise => {
                             indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0 bg-rose-500';
                             errorPromise.then(error => {
-                                messageEl.innerHTML = `<span class="font-bold text-rose-600">FAIL</span> – <span class="text-zinc-500">${error.detail || 'Could not connect'}</span>`;
+                                messageEl.innerHTML = `<span class="font-semibold text-rose-700">FAIL</span> – <span class="text-zinc-500">${error.detail || 'Could not connect'}</span>`;
                             }).catch(() => {
-                                messageEl.innerHTML = `<span class="font-bold text-rose-600">FAIL</span> – <span class="text-zinc-500">Failed to perform check</span>`;
+                                messageEl.innerHTML = `<span class="font-semibold text-rose-700">FAIL</span> – <span class="text-zinc-500">Failed to perform check</span>`;
                             });
                         })
                         .finally(() => {
@@ -266,8 +271,7 @@
             filterCheckbox.addEventListener('change', applyFilter);
             document.addEventListener('visibilitychange', () => !document.hidden && runAllHealthChecks());
 
-            // Initial setup
-            allCards.forEach(updateCardAppearance);
+            document.querySelectorAll('.card').forEach(updateCardAppearance);
             runAllHealthChecks();
         });
     </script>

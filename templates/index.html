@@ -194,13 +194,16 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const filterCheckbox = document.getElementById('filter-checkbox');
+            let healthCheckInterval = null;
 
             const updateCardAppearance = (card) => {
                 const status = card.dataset.status;
-                card.classList.remove('bg-white', 'border-zinc-200', 'bg-emerald-50', 'border-emerald-300', 'bg-rose-50', 'border-rose-300');
-                if (status === 'success') {
-                    card.classList.add('bg-emerald-50', 'border-emerald-300');
-                } else if (status === 'failing') {
+                card.classList.remove(
+                    'bg-white', 'border-zinc-200',
+                    'bg-rose-50', 'border-rose-300'
+                );
+
+                if (status === 'failing') {
                     card.classList.add('bg-rose-50', 'border-rose-300');
                 } else {
                     card.classList.add('bg-white', 'border-zinc-200');
@@ -278,11 +281,30 @@
                 });
             };
 
+            const startPolling = () => {
+                if (healthCheckInterval) return;
+                runAllHealthChecks();
+                healthCheckInterval = setInterval(runAllHealthChecks, 5000);
+            };
+
+            const stopPolling = () => {
+                clearInterval(healthCheckInterval);
+                healthCheckInterval = null;
+            };
+
             filterCheckbox.addEventListener('change', applyFilter);
-            document.addEventListener('visibilitychange', () => !document.hidden && runAllHealthChecks());
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    startPolling();
+                }
+            });
 
             document.querySelectorAll('.card').forEach(updateCardAppearance);
-            runAllHealthChecks();
+
+            startPolling();
         });
     </script>
 </body>

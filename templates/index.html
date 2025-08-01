@@ -106,7 +106,7 @@
                                 {% endfor %}
                                 {% for backend in rule.get('backendRefs', []) %}
                                 <div class="flex items-center mt-2">
-                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0" data-url="{{ backend.internal_url }}"></span>
+                                    <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0" data-url="{{ backend.internal_url }}" data-status="neutral"></span>
                                     <p class="truncate text-sm text-zinc-600">
                                         Backend: <span class="font-medium text-zinc-800">{{ backend.name }}:{{ backend.port }}</span>
                                     </p>
@@ -196,15 +196,26 @@
             const filterCheckbox = document.getElementById('filter-checkbox');
             let healthCheckInterval = null;
 
+            const setIndicatorAppearance = (indicator, status) => {
+                indicator.classList.remove('bg-emerald-500', 'bg-rose-500', 'bg-zinc-300');
+                switch (status) {
+                    case 'success':
+                        indicator.classList.add('bg-emerald-500');
+                        break;
+                    case 'failing':
+                        indicator.classList.add('bg-rose-500');
+                        break;
+                    default:
+                        indicator.classList.add('bg-zinc-300');
+                        break;
+                }
+            };
+
             const updateCardAppearance = (card) => {
                 const status = card.dataset.status;
-                card.classList.remove(
-                    'bg-white', 'border-zinc-200',
-                    'bg-rose-50', 'border-rose-300'
-                );
-
+                card.classList.remove('bg-white', 'border-zinc-200', 'bg-rose-50', 'border-rose-300');
                 if (status === 'failing') {
-                    card.classList.add('bg-rose-50', 'border-rose-300');
+                    card.classList.add('bg-rose-50', 'border-rose-300', 'animate-ping');
                 } else {
                     card.classList.add('bg-white', 'border-zinc-200');
                 }
@@ -212,11 +223,7 @@
 
             const updateCardStatus = (card) => {
                 const indicators = card.querySelectorAll('.status-indicator');
-                const statuses = Array.from(indicators).map(ind => {
-                    if (ind.classList.contains('bg-emerald-500')) return 'success';
-                    if (ind.classList.contains('bg-rose-500')) return 'failing';
-                    return 'neutral';
-                });
+                const statuses = Array.from(indicators).map(ind => ind.dataset.status);
 
                 if (statuses.includes('failing')) {
                     card.dataset.status = 'failing';
@@ -243,27 +250,32 @@
                         indicator.classList.add('hidden');
                         return;
                     }
-
                     const card = indicator.closest('.card');
                     const messageEl = card.querySelector(`.status-message[data-url="${url}"]`);
 
-                    indicator.classList.add('animate-pulse');
+                    indicator.classList.add('animate-ping');
+                    // A timer to remove the class after the animation completes (1000ms = 1s).
+                    // This ensures the animation plays exactly once per check.
+                    setTimeout(() => {
+                        indicator.classList.remove('animate-ping');
+                    }, 1000);
 
                     fetch(`/api/check-status?url=${encodeURIComponent(url)}`, { cache: 'no-cache' })
                         .then(response => response.ok ? response.json() : Promise.reject(response.json()))
                         .then(data => {
-                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
+                            let newStatus = 'failing';
                             if (data.status_code < 500 && data.status_code != 404) {
-                                indicator.classList.add('bg-emerald-500');
+                                newStatus = 'success';
                                 messageEl.innerHTML = `<span class="font-semibold text-emerald-700">OK (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
                             } else {
-                                indicator.classList.add('bg-rose-500');
                                 messageEl.innerHTML = `<span class="font-semibold text-rose-700">ERROR (${data.status_code})</span> – <code class="text-zinc-500">${data.url}</code>`;
                             }
+                            indicator.dataset.status = newStatus;
+                            setIndicatorAppearance(indicator, newStatus);
                         })
                         .catch(errorPromise => {
-                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
-                            indicator.classList.add('bg-rose-500');
+                            indicator.dataset.status = 'failing';
+                            setIndicatorAppearance(indicator, 'failing');
                             errorPromise.then(error => {
                                 messageEl.innerHTML = `<span class="font-semibold text-rose-700">FAIL</span> – <span class="text-zinc-500">${error.detail || 'Could not connect'}</span>`;
                             }).catch(() => {
@@ -271,7 +283,6 @@
                             });
                         })
                         .finally(() => {
-                            indicator.classList.remove('animate-pulse');
                             updateCardStatus(card);
                             applyFilter();
                         });
@@ -290,7 +301,6 @@
             };
 
             filterCheckbox.addEventListener('change', applyFilter);
-
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     stopPolling();
@@ -298,9 +308,7 @@
                     startPolling();
                 }
             });
-
             document.querySelectorAll('.card').forEach(updateCardAppearance);
-
             startPolling();
         });
     </script>

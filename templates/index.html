@@ -211,11 +211,6 @@
             };
 
             const updateCardStatus = (card) => {
-                if (card.dataset.status === 'failing' && !card.querySelector('.status-indicator.bg-rose-500')) {
-                    updateCardAppearance(card);
-                    return;
-                }
-
                 const indicators = card.querySelectorAll('.status-indicator');
                 const statuses = Array.from(indicators).map(ind => {
                     if (ind.classList.contains('bg-emerald-500')) return 'success';

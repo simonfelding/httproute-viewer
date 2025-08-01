@@ -68,8 +68,10 @@
                         <ul class="space-y-1">
                             {% for hostname in route.spec.hostnames %}
                             <li class="flex items-center">
-                                <a href="http://{{ hostname }}" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ hostname }}</a>
+                                <a href="http://{{ hostname }}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ hostname }}</a>
                             </li>
+                            {% else %}
+                            <li class="text-sm text-zinc-500 italic">No hostnames configured.</li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -85,7 +87,7 @@
                             </a>
                             {% endif %}
                             {% if 'owner/link' in route.metadata.annotations %}
-                            <a href="{{ route.metadata.annotations['owner/link'] }}" target="_blank" class="flex items-center text-sm text-indigo-600 hover:underline group">
+                            <a href="{{ route.metadata.annotations['owner/link'] }}" target="_blank" rel="noopener noreferrer" class="flex items-center text-sm text-indigo-600 hover:underline group">
                                 <svg class="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                                 {{ route.metadata.annotations['owner/link'] }}
                             </a>
@@ -100,9 +102,9 @@
                         {% for rule in route.spec.rules %}
                             <div class="p-4 border border-zinc-200 rounded-xl bg-zinc-50/70">
                                 {% for match in rule.get('matches', []) %}
-                                    <p class="text-sm font-medium text-zinc-800">Path: <code class="bg-zinc-200 px-1 py-0.5 rounded">{{ match.path.value }}</code></p>
+                                    <p class="text-sm font-medium text-zinc-800">Path: <code class="bg-zinc-200 px-1 py-0.5 rounded">{{ match.get('path', {}).get('value', 'N/A') }}</code></p>
                                 {% endfor %}
-                                {% for backend in rule.backendRefs %}
+                                {% for backend in rule.get('backendRefs', []) %}
                                 <div class="flex items-center mt-2">
                                     <span class="status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0" data-url="{{ backend.internal_url }}"></span>
                                     <p class="truncate text-sm text-zinc-600">
@@ -119,33 +121,26 @@
                 <!-- Card Footer with metadata -->
                 <div class="bg-zinc-100/50 rounded-b-2xl px-6 py-5 mt-auto border-t border-zinc-200 space-y-5">
                     {% if route.metadata.annotations %}
-                        {# Create a new dictionary containing only the 'other' annotations #}
-                        {% set other_annotations = {} %}
-                        {% for key, value in route.metadata.annotations.items() %}
-                            {% if key not in ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
-                                {% do other_annotations.update({key: value}) %}
-                            {% endif %}
-                        {% endfor %}
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
+                        <div class="flex flex-wrap gap-1.5">
+                            {# 1. Iterate directly over all annotations #}
+                            {% for key, value in route.metadata.annotations.items() %}
 
-                        {% if other_annotations %}
-                        <div>
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Annotations</h3>
-                            <div class="flex flex-wrap gap-1.5">
-                                {# Iterate over the items of the new dictionary, which is a safe operation #}
-                                {% for key, value in other_annotations.items() %}
+                                {# 2. Add a condition to skip the keys you've already displayed elsewhere #}
+                                {% if key not in ['kubernetes.io/description', 'owner/contact', 'owner/link'] %}
                                 <div class="bg-zinc-200 text-zinc-700 text-xs font-medium px-2 py-1 rounded-full">
                                     <span class="font-semibold">{{ key }}</span>:
-                                    {# Add a check to ensure value is a string before calling startswith #}
                                     {% if value is string and value.startswith('http') %}
-                                        <a href="{{ value }}" target="_blank" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
+                                        <a href="{{ value }}" target="_blank" rel="noopener noreferrer" class="opacity-80 hover:underline text-indigo-600">{{ value }}</a>
                                     {% else %}
                                         <span class="opacity-80">{{ value }}</span>
                                     {% endif %}
                                 </div>
-                                {% endfor %}
-                            </div>
+                                {% endif %}
+                            {% endfor %}
                         </div>
-                        {% endif %}
+                    </div>
                     {% endif %}
 
                     {% if route.metadata.labels %}
@@ -160,6 +155,7 @@
                         </div>
                     </div>
                     {% endif %}
+
                     {% if route.status and route.status.parents %}
                     <div>
                         <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Gateway Status</h3>
@@ -176,11 +172,12 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+
                     <div>
                         <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Backend Health</h3>
                         <div class="space-y-1">
                         {% for rule in route.spec.rules %}
-                            {% for backend in rule.backendRefs %}
+                            {% for backend in rule.get('backendRefs', []) %}
                                 <div class="status-message text-sm" data-url="{{ backend.internal_url }}"></div>
                             {% endfor %}
                         {% endfor %}

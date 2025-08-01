@@ -251,14 +251,10 @@
 
                     const card = indicator.closest('.card');
                     const messageEl = card.querySelector(`.status-message[data-url="${url}"]`);
-                    const isStatusKnown = indicator.classList.contains('bg-emerald-500') || indicator.classList.contains('bg-rose-500');
 
-                    if (!isStatusKnown) {
-                        indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0 bg-zinc-300 animate-pulse';
-                        messageEl.innerHTML = `<span class="text-zinc-500">Checking...</span>`;
-                    }
+                    indicator.classList.add('animate-pulse');
 
-                    fetch(`/api/check-status?url=${encodeURIComponent(url)}`)
+                    fetch(`/api/check-status?url=${encodeURIComponent(url)}`, { cache: 'no-cache' })
                         .then(response => response.ok ? response.json() : Promise.reject(response.json()))
                         .then(data => {
                             indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
@@ -271,7 +267,8 @@
                             }
                         })
                         .catch(errorPromise => {
-                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0 bg-rose-500';
+                            indicator.className = 'status-indicator h-2 w-2 rounded-full mr-2 flex-shrink-0';
+                            indicator.classList.add('bg-rose-500');
                             errorPromise.then(error => {
                                 messageEl.innerHTML = `<span class="font-semibold text-rose-700">FAIL</span> – <span class="text-zinc-500">${error.detail || 'Could not connect'}</span>`;
                             }).catch(() => {
@@ -279,6 +276,7 @@
                             });
                         })
                         .finally(() => {
+                            indicator.classList.remove('animate-pulse');
                             updateCardStatus(card);
                             applyFilter();
                         });

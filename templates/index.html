@@ -13,6 +13,16 @@
         .card:hover {
              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
+        @keyframes pulse-bg {
+          70% {
+            background-color: #f43f5e; /* Corresponds to Tailwind's bg-rose-500 */
+          }
+        }
+
+        .card-failing-pulse {
+          /* Applies our animation with a slow, 4-second loop that is infinite */
+          animation: pulse-bg 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
 </head>
 <body class="bg-zinc-100 text-zinc-800">
@@ -213,9 +223,9 @@
 
             const updateCardAppearance = (card) => {
                 const status = card.dataset.status;
-                card.classList.remove('bg-white', 'border-zinc-200', 'bg-rose-50', 'border-rose-300');
+                card.classList.remove('bg-white', 'border-zinc-200', 'bg-rose-50', 'border-rose-300', 'card-failing-pulse');
                 if (status === 'failing') {
-                    card.classList.add('bg-rose-50', 'border-rose-300', 'animate-ping');
+                    card.classList.add('bg-rose-50', 'border-rose-300', 'card-failing-pulse');
                 } else {
                     card.classList.add('bg-white', 'border-zinc-200');
                 }

@@ -70,12 +70,24 @@ async def read_root(request: Request):
     sorted_routes = sorted(processed_routes, key=lambda r: r['metadata']['name'])
     hostname = request.headers.get("host")
 
+    # Get client IP (try X-Forwarded-For, then fallback to client.host)
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        client_ip = xff.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else None
+
+    # Convert headers to a dict for template rendering
+    headers_dict = dict(request.headers)
+
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "hostname": hostname,
             "http_routes": sorted_routes,
+            "client_ip": client_ip,
+            "request_headers": headers_dict,
         },
     )
 

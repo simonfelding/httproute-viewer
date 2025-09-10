@@ -206,7 +206,24 @@
         </div>
     </main>
 
-        <script>
+    <footer class="container mx-auto px-6 py-6 mt-10 text-xs text-zinc-500 border-t border-zinc-200">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div>
+                <span class="font-semibold text-zinc-700">Client IP:</span>
+                <span class="ml-1">{{ client_ip or 'Unknown' }}</span>
+            </div>
+            <div>
+                <span class="font-semibold text-zinc-700">HTTP Request Headers:</span>
+                <ul class="ml-2 mt-1 space-y-0.5">
+                    {% for key, value in request_headers.items() %}
+                        <li><span class="text-zinc-700">{{ key }}:</span> <span class="text-zinc-600">{{ value }}</span></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </footer>
+
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
             const filterCheckbox = document.getElementById('filter-checkbox');
             let healthCheckInterval = null;

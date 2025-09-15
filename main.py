@@ -61,7 +61,7 @@ def get_prepared_routes_and_urls():
     return route_items, allowed_urls
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route('/', methods=['GET', 'HEAD'])
 async def read_root(request: Request):
     """Handles the main page request using the cached and processed data."""
 
